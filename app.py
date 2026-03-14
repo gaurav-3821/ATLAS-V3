@@ -27,10 +27,12 @@ def get_api_config() -> dict[str, str]:
 def main() -> None:
     apply_atlas_theme()
     api_config = get_api_config()
-    if api_config.get("API_KEY_1"):
-    st.success("Weather API key is loaded")
+   if api_config.get("API_KEY_1"):
+    masked = api_config["API_KEY_1"][:4] + "..." + api_config["API_KEY_1"][-4:]
+    st.info(f"Weather API key detected: {masked}")
 else:
     st.error("Weather API key is missing")
+
     dataset, source_label = get_active_dataset()
     logo_path = Path(__file__).resolve().parent / "assets" / "atlas_logo.svg"
 
