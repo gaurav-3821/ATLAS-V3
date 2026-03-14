@@ -1,167 +1,176 @@
-from __future__ import annotations
+def inject_glass_ui() -> None:
+    st.markdown(
+        """
+        <style>
+        :root {
+            --atlas-ink: #10243d;
+            --atlas-muted: #4c617a;
+            --glass-fill: linear-gradient(135deg, rgba(255,255,255,0.30), rgba(255,255,255,0.10));
+            --glass-stroke: rgba(255,255,255,0.42);
+            --glass-shadow: 0 24px 60px rgba(15, 42, 84, 0.14);
+        }
 
-from pathlib import Path
+        .stApp {
+            background:
+                radial-gradient(circle at 12% 12%, rgba(125, 211, 252, 0.28), transparent 30%),
+                radial-gradient(circle at 88% 18%, rgba(147, 197, 253, 0.24), transparent 28%),
+                linear-gradient(140deg, #eef5ff 0%, #dde8fb 45%, #f4f8ff 100%);
+            color: var(--atlas-ink);
+        }
 
-import streamlit as st
-import os
+        .main .block-container {
+            max-width: 1180px;
+            padding-top: 2rem;
+            padding-bottom: 3rem;
+        }
 
-from utils.data_loader import get_active_dataset
-from utils.style import apply_atlas_theme, render_feature_card, render_info_banner
+        [data-testid="stSidebar"] > div:first-child {
+            background: linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.14));
+            border-right: 1px solid rgba(255,255,255,0.42);
+            backdrop-filter: blur(22px) saturate(180%);
+            -webkit-backdrop-filter: blur(22px) saturate(180%);
+        }
 
+        .atlas-hero,
+        .atlas-panel,
+        .atlas-stat-card,
+        .atlas-feature-card,
+        [data-testid="stExpander"],
+        [data-testid="stAlert"],
+        div[data-testid="stPageLink"] {
+            background: var(--glass-fill);
+            border: 1px solid var(--glass-stroke);
+            box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255,255,255,0.35);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border-radius: 24px;
+            transition:
+                transform 240ms cubic-bezier(.16,1,.3,1),
+                box-shadow 240ms cubic-bezier(.16,1,.3,1),
+                border-color 240ms ease,
+                background 240ms ease;
+            animation: atlasFadeUp 720ms cubic-bezier(.16,1,.3,1) both;
+        }
 
-st.set_page_config(
-    page_title="ATLAS",
-    page_icon=":material/public:",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-def get_api_config() -> dict[str, str]:
-    return {
-        "EARTHDATA_TOKEN": st.secrets.get("EARTHDATA_TOKEN", os.getenv("EARTHDATA_TOKEN", "")),
-        "API_KEY_1": st.secrets.get("API_KEY_1", os.getenv("API_KEY_1", "")),
-        "API_KEY_2": st.secrets.get("API_KEY_2", os.getenv("API_KEY_2", "")),
-        "API_KEY_3": st.secrets.get("API_KEY_3", os.getenv("API_KEY_3", "")),
-    }
+        .atlas-hero {
+            padding: 2rem 2.2rem;
+            position: relative;
+            overflow: hidden;
+        }
 
+        .atlas-hero::after {
+            content: "";
+            position: absolute;
+            inset: auto -10% -35% auto;
+            width: 16rem;
+            height: 16rem;
+            background: radial-gradient(circle, rgba(255,255,255,0.45), rgba(255,255,255,0));
+            filter: blur(12px);
+            pointer-events: none;
+        }
 
-def main() -> None:
-    apply_atlas_theme()
-    api_config = get_api_config()
-   
-    dataset, source_label = get_active_dataset()
-    logo_path = Path(__file__).resolve().parent / "assets" / "atlas_logo.svg"
+        .atlas-kicker {
+            font-size: 0.82rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: #48617e;
+            margin-bottom: 0.35rem;
+        }
 
-    logo_col, hero_col = st.columns((0.16, 0.84))
-    with logo_col:
-        if logo_path.exists():
-            st.image(str(logo_path), use_container_width=True)
+        .atlas-hero h1 {
+            font-family: "Aptos Display", "Segoe UI Variable", sans-serif;
+            font-size: clamp(3rem, 8vw, 5.2rem);
+            line-height: 0.95;
+            letter-spacing: -0.04em;
+            margin: 0;
+            color: #0f1f36;
+        }
 
-    with hero_col:
-        st.markdown(
-            """
-            <section class="atlas-hero">
-                <div class="atlas-kicker">Hack It Out - Technex'26</div>
-                <h1>ATLAS</h1>
-                <p class="atlas-tagline">Turning Raw Climate Data into Compelling Visual Stories</p>
-                <p class="atlas-subtitle">
-                    Explore decades of climate change through maps, comparisons, guided narratives,
-                    and a globe view built for judges, researchers, educators, and anyone with a browser.
-                </p>
-            </section>
-            """,
-            unsafe_allow_html=True,
-        )
+        .atlas-tagline {
+            font-size: 1.15rem;
+            color: #28405d;
+            margin-top: 0.9rem;
+        }
 
-    render_info_banner(
-        f"Live source: {source_label}. A synthetic NetCDF dataset is generated automatically on first launch if needed."
+        .atlas-subtitle {
+            color: var(--atlas-muted);
+            max-width: 52rem;
+            line-height: 1.7;
+            margin-bottom: 0;
+        }
+
+        .atlas-card-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .atlas-stat-card,
+        .atlas-feature-card,
+        .atlas-panel {
+            padding: 1.1rem 1.15rem;
+        }
+
+        .atlas-stat-label {
+            display: block;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #4a627e;
+            margin-bottom: 0.45rem;
+        }
+
+        .atlas-stat-value {
+            display: block;
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #10243d;
+        }
+
+        .atlas-panel h4,
+        .atlas-feature-card h4 {
+            font-family: "Aptos Display", "Segoe UI Variable", sans-serif;
+            letter-spacing: -0.02em;
+        }
+
+        .atlas-hero:hover,
+        .atlas-panel:hover,
+        .atlas-stat-card:hover,
+        .atlas-feature-card:hover,
+        [data-testid="stExpander"]:hover,
+        div[data-testid="stPageLink"]:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 28px 70px rgba(15, 42, 84, 0.18), inset 0 1px 0 rgba(255,255,255,0.46);
+            border-color: rgba(255,255,255,0.60);
+        }
+
+        div[data-testid="stPageLink"] a {
+            display: block;
+            padding: 0.95rem 1rem;
+            text-decoration: none;
+            color: var(--atlas-ink);
+        }
+
+        p, label, .stMarkdown {
+            color: var(--atlas-ink);
+        }
+
+        @keyframes atlasFadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(18px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .atlas-hero {
+                padding: 1.5rem;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
-
-    cta_col, stats_col = st.columns((1.1, 1.0))
-    with cta_col:
-        st.markdown("### What ATLAS does")
-        st.write(
-            "ATLAS turns raw NetCDF climate files into an editorial-style experience. "
-            "Use Explore for the main story, Compare for measurable change, Story Mode for the pitch, "
-            "and 3D Globe for the final memorable reveal."
-        )
-        st.page_link("pages/1_Explore.py", label="Open Explore", icon=":material/travel_explore:")
-        st.page_link("pages/2_Compare.py", label="Open Compare", icon=":material/compare_arrows:")
-        st.page_link("pages/Trends.py", label="Open Trends", icon=":material/show_chart:")
-        st.page_link("pages/3_Story_Mode.py", label="Open Story Mode", icon=":material/menu_book:")
-        st.page_link("pages/4_3D_Globe.py", label="Open 3D Globe", icon=":material/public:")
-        st.page_link("pages/5_About.py", label="Open About", icon=":material/info:")
-
-    with stats_col:
-        st.markdown("### Why it wins")
-        st.markdown(
-            """
-            <div class="atlas-card-grid">
-                <div class="atlas-stat-card">
-                    <span class="atlas-stat-label">Years of Data</span>
-                    <span class="atlas-stat-value">1950 to 2023</span>
-                </div>
-                <div class="atlas-stat-card">
-                    <span class="atlas-stat-label">Core Views</span>
-                    <span class="atlas-stat-value">Explore, Compare, Trends, Story, Globe</span>
-                </div>
-                <div class="atlas-stat-card">
-                    <span class="atlas-stat-label">Demo Reliability</span>
-                    <span class="atlas-stat-value">Zero-internet fallback</span>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("### Experience Highlights")
-    feature_cols = st.columns(3)
-    with feature_cols[0]:
-        render_feature_card(
-            "Explore",
-            "Interactive heatmaps, local trend lines, anomaly markers, and insight cards.",
-        )
-    with feature_cols[1]:
-        render_feature_card(
-            "Compare",
-            "Side-by-side period comparison plus a difference map that reveals where change happened.",
-        )
-    with feature_cols[2]:
-        render_feature_card(
-            "Story Mode",
-            "A guided narrative through baseline climate, El Nino, Arctic amplification, and record heat.",
-        )
-    extra_col_a, extra_col_b = st.columns(2)
-    with extra_col_a:
-        render_feature_card(
-            "Trends",
-            "A dedicated long-term analysis page with moving averages, baseline anomalies, and trend-per-decade metrics.",
-        )
-    with extra_col_b:
-        render_feature_card(
-            "3D Globe",
-            "An orbital perspective with a latitude profile and pitch guidance for the final demo moment.",
-        )
-
-    st.markdown("### Built for Team 404")
-    team_left, team_right = st.columns((1.2, 1.0))
-    with team_left:
-        st.write(
-            "The app is the pitch. Instead of switching to slides, your team can walk judges through the climate story directly inside ATLAS."
-        )
-        st.write(
-            "The current demo dataset includes multiple variables and realistic signals such as seasonality, long-term warming, Arctic amplification, ENSO spikes, and a 2023 heat peak."
-        )
-    with team_right:
-        st.markdown(
-            """
-            <div class="atlas-panel">
-                <h4>Team 404</h4>
-                <p>Gaurav Tayde - Backend & Architecture</p>
-                <p>Aditya Kumar - Visualization & Frontend</p>
-                <p>Gaurav Yadav - Features & Data Engineering</p>
-                <p>Prem Prakash Singh - Story, Testing & Pitch</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("### Suggested 2-Minute Demo Route")
-    route_cols = st.columns(4)
-    route_items = [
-        ("1. Home", "Set the hook: ATLAS makes climate data explorable without code."),
-        ("2. Explore", "Show the warming map, local trend line, and annual timelapse."),
-        ("3. Story Mode", "Walk judges through the four-scene climate narrative."),
-        ("4. Globe", "Finish with the globe for the memorable closing visual."),
-    ]
-    for col, (title, body) in zip(route_cols, route_items):
-        with col:
-            render_feature_card(title, body)
-
-    with st.expander("Dataset Snapshot", expanded=False):
-        st.write(dict(dataset.sizes))
-        st.write("Variables", list(dataset.data_vars))
-        st.write("Attributes", dict(dataset.attrs))
-
-
-if __name__ == "__main__":
-    main()
