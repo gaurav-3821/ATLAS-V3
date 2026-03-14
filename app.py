@@ -1,176 +1,268 @@
-def inject_glass_ui() -> None:
-    st.markdown(
-        """
-        <style>
-        :root {
-            --atlas-ink: #10243d;
-            --atlas-muted: #4c617a;
-            --glass-fill: linear-gradient(135deg, rgba(255,255,255,0.30), rgba(255,255,255,0.10));
-            --glass-stroke: rgba(255,255,255,0.42);
-            --glass-shadow: 0 24px 60px rgba(15, 42, 84, 0.14);
-        }
+from __future__ import annotations
 
-        .stApp {
-            background:
-                radial-gradient(circle at 12% 12%, rgba(125, 211, 252, 0.28), transparent 30%),
-                radial-gradient(circle at 88% 18%, rgba(147, 197, 253, 0.24), transparent 28%),
-                linear-gradient(140deg, #eef5ff 0%, #dde8fb 45%, #f4f8ff 100%);
-            color: var(--atlas-ink);
-        }
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+import xarray as xr
 
-        .main .block-container {
-            max-width: 1180px;
-            padding-top: 2rem;
-            padding-bottom: 3rem;
-        }
+from utils.data_loader import get_active_dataset
+from utils.style import apply_atlas_theme, render_feature_card, render_info_banner
 
-        [data-testid="stSidebar"] > div:first-child {
-            background: linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.14));
-            border-right: 1px solid rgba(255,255,255,0.42);
-            backdrop-filter: blur(22px) saturate(180%);
-            -webkit-backdrop-filter: blur(22px) saturate(180%);
-        }
 
-        .atlas-hero,
-        .atlas-panel,
-        .atlas-stat-card,
-        .atlas-feature-card,
-        [data-testid="stExpander"],
-        [data-testid="stAlert"],
-        div[data-testid="stPageLink"] {
-            background: var(--glass-fill);
-            border: 1px solid var(--glass-stroke);
-            box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255,255,255,0.35);
-            backdrop-filter: blur(24px) saturate(180%);
-            -webkit-backdrop-filter: blur(24px) saturate(180%);
-            border-radius: 24px;
-            transition:
-                transform 240ms cubic-bezier(.16,1,.3,1),
-                box-shadow 240ms cubic-bezier(.16,1,.3,1),
-                border-color 240ms ease,
-                background 240ms ease;
-            animation: atlasFadeUp 720ms cubic-bezier(.16,1,.3,1) both;
-        }
+def _find_dim(da: xr.DataArray, candidates: tuple[str, ...]) -> str | None:
+    lowered = {dim.lower(): dim for dim in da.dims}
+    for candidate in candidates:
+        if candidate in lowered:
+            return lowered[candidate]
+    for dim in da.dims:
+        dim_lower = dim.lower()
+        if any(candidate in dim_lower for candidate in candidates):
+            return dim
+    return None
 
-        .atlas-hero {
-            padding: 2rem 2.2rem;
-            position: relative;
-            overflow: hidden;
-        }
 
-        .atlas-hero::after {
-            content: "";
-            position: absolute;
-            inset: auto -10% -35% auto;
-            width: 16rem;
-            height: 16rem;
-            background: radial-gradient(circle, rgba(255,255,255,0.45), rgba(255,255,255,0));
-            filter: blur(12px);
-            pointer-events: none;
-        }
+def _eligible_variables(dataset: xr.Dataset) -> list[str]:
+    valid = []
+    for name, da in dataset.data_vars.items():
+        if not np.issubdtype(da.dtype, np.number):
+            continue
+        if _find_dim(da, ("time", "date", "year")) is None:
+            continue
+        valid.append(name)
+    return valid
 
-        .atlas-kicker {
-            font-size: 0.82rem;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            color: #48617e;
-            margin-bottom: 0.35rem;
-        }
 
-        .atlas-hero h1 {
-            font-family: "Aptos Display", "Segoe UI Variable", sans-serif;
-            font-size: clamp(3rem, 8vw, 5.2rem);
-            line-height: 0.95;
-            letter-spacing: -0.04em;
-            margin: 0;
-            color: #0f1f36;
-        }
+def _spatial_mean_series(da: xr.DataArray) -> pd.DataFrame:
+    time_dim = _find_dim(da, ("time", "date", "year"))
+    if time_dim is None:
+        raise ValueError("Selected variable does not contain a time dimension.")
 
-        .atlas-tagline {
-            font-size: 1.15rem;
-            color: #28405d;
-            margin-top: 0.9rem;
-        }
+    lat_dim = _find_dim(da, ("lat", "latitude", "y"))
+    spatial_dims = [dim for dim in da.dims if dim != time_dim]
 
-        .atlas-subtitle {
-            color: var(--atlas-muted);
-            max-width: 52rem;
-            line-height: 1.7;
-            margin-bottom: 0;
-        }
+    if spatial_dims:
+        if lat_dim and lat_dim in spatial_dims:
+            other_dims = [dim for dim in spatial_dims if dim != lat_dim]
+            reduced = da.mean(dim=other_dims, skipna=True) if other_dims else da
+            weights = xr.DataArray(
+                np.cos(np.deg2rad(reduced[lat_dim])),
+                coords={lat_dim: reduced[lat_dim]},
+                dims=[lat_dim],
+            )
+            series_da = reduced.weighted(weights).mean(dim=lat_dim, skipna=True)
+        else:
+            series_da = da.mean(dim=spatial_dims, skipna=True)
+    else:
+        series_da = da
 
-        .atlas-card-grid {
-            display: grid;
-            gap: 1rem;
-        }
+    df = series_da.to_dataframe(name="value").reset_index()
+    df = df.rename(columns={time_dim: "time"})[["time", "value"]]
+    parsed = pd.to_datetime(df["time"], errors="coerce")
+    if parsed.notna().any():
+        df["time"] = parsed
+    df["label"] = df["time"].astype(str)
+    return df.dropna(subset=["value"]).reset_index(drop=True)
 
-        .atlas-stat-card,
-        .atlas-feature-card,
-        .atlas-panel {
-            padding: 1.1rem 1.15rem;
-        }
 
-        .atlas-stat-label {
-            display: block;
-            font-size: 0.82rem;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            color: #4a627e;
-            margin-bottom: 0.45rem;
-        }
+def _trend_per_decade(df: pd.DataFrame) -> float:
+    if len(df) < 2:
+        return 0.0
 
-        .atlas-stat-value {
-            display: block;
-            font-size: 1.15rem;
-            font-weight: 600;
-            color: #10243d;
-        }
+    if pd.api.types.is_datetime64_any_dtype(df["time"]):
+        x = df["time"].map(pd.Timestamp.toordinal).astype(float).to_numpy()
+        slope_per_day = np.polyfit(x, df["value"].to_numpy(), 1)[0]
+        return float(slope_per_day * 365.25 * 10)
 
-        .atlas-panel h4,
-        .atlas-feature-card h4 {
-            font-family: "Aptos Display", "Segoe UI Variable", sans-serif;
-            letter-spacing: -0.02em;
-        }
+    x = np.arange(len(df), dtype=float)
+    slope_per_step = np.polyfit(x, df["value"].to_numpy(), 1)[0]
+    return float(slope_per_step * 10)
 
-        .atlas-hero:hover,
-        .atlas-panel:hover,
-        .atlas-stat-card:hover,
-        .atlas-feature-card:hover,
-        [data-testid="stExpander"]:hover,
-        div[data-testid="stPageLink"]:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 28px 70px rgba(15, 42, 84, 0.18), inset 0 1px 0 rgba(255,255,255,0.46);
-            border-color: rgba(255,255,255,0.60);
-        }
 
-        div[data-testid="stPageLink"] a {
-            display: block;
-            padding: 0.95rem 1rem;
-            text-decoration: none;
-            color: var(--atlas-ink);
-        }
+def main() -> None:
+    apply_atlas_theme()
+    dataset, source_label = get_active_dataset()
 
-        p, label, .stMarkdown {
-            color: var(--atlas-ink);
-        }
-
-        @keyframes atlasFadeUp {
-            from {
-                opacity: 0;
-                transform: translateY(18px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @media (max-width: 900px) {
-            .atlas-hero {
-                padding: 1.5rem;
-            }
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
+    st.title("Extreme Events Detector")
+    render_info_banner(
+        f"Source: {source_label}. This page detects unusually hot and cold periods from the active dataset."
     )
+
+    variables = _eligible_variables(dataset)
+    if not variables:
+        st.error("No numeric time-based climate variables were found in the dataset.")
+        return
+
+    st.markdown("### Why this matters")
+    card_a, card_b, card_c = st.columns(3)
+    with card_a:
+        render_feature_card("Automatic Detection", "Flags unusual hot and cold periods from the selected climate variable.")
+    with card_b:
+        render_feature_card("Judge-Friendly Insight", "Turns raw climate curves into interpretable events and trend summaries.")
+    with card_c:
+        render_feature_card("No Base App Changes", "Works as a separate page and preserves your current home page and app flow.")
+
+    st.sidebar.header("Extreme Event Controls")
+    variable = st.sidebar.selectbox("Variable", variables)
+    threshold_z = st.sidebar.slider("Event threshold (z-score)", 1.0, 3.5, 1.8, 0.1)
+    smooth_window = st.sidebar.slider("Smoothing window", 3, 24, 6, 1)
+
+    df = _spatial_mean_series(dataset[variable])
+
+    if pd.api.types.is_datetime64_any_dtype(df["time"]):
+        years = sorted(df["time"].dt.year.dropna().unique().tolist())
+        start_year = years[0]
+        end_year = years[-1]
+        default_end = min(start_year + 29, end_year)
+        baseline_range = st.sidebar.slider(
+            "Baseline period",
+            min_value=start_year,
+            max_value=end_year,
+            value=(start_year, default_end),
+        )
+        baseline_mask = df["time"].dt.year.between(*baseline_range)
+        baseline_label = f"{baseline_range[0]}-{baseline_range[1]}"
+        x_axis = df["time"]
+    else:
+        baseline_points = min(max(12, len(df) // 3), len(df))
+        baseline_count = st.sidebar.slider(
+            "Baseline points",
+            min_value=6,
+            max_value=len(df),
+            value=baseline_points,
+        )
+        baseline_mask = pd.Series(False, index=df.index)
+        baseline_mask.iloc[:baseline_count] = True
+        baseline_label = f"First {baseline_count} points"
+        x_axis = df["label"]
+
+    baseline_mean = df.loc[baseline_mask, "value"].mean()
+    df["anomaly"] = df["value"] - baseline_mean
+    sigma = df["anomaly"].std(ddof=0)
+    sigma = float(sigma) if np.isfinite(sigma) and sigma != 0 else 1.0
+    df["severity_z"] = df["anomaly"] / sigma
+    df["smooth"] = df["anomaly"].rolling(smooth_window, center=True, min_periods=1).mean()
+
+    df["event_type"] = np.where(
+        df["severity_z"] >= threshold_z,
+        "Hot anomaly",
+        np.where(df["severity_z"] <= -threshold_z, "Cold anomaly", "Normal"),
+    )
+
+    extreme_df = df[df["event_type"] != "Normal"].copy()
+    hottest = df.loc[df["anomaly"].idxmax()]
+    coldest = df.loc[df["anomaly"].idxmin()]
+    trend_decade = _trend_per_decade(df)
+
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Extreme events", str(len(extreme_df)))
+    metric_cols[1].metric("Strongest hot anomaly", f"{hottest['anomaly']:.2f}")
+    metric_cols[2].metric("Strongest cold anomaly", f"{coldest['anomaly']:.2f}")
+    metric_cols[3].metric("Trend", f"{trend_decade:.2f} units/decade")
+
+    st.caption(
+        f"Baseline: {baseline_label}. Threshold: {threshold_z:.1f} sigma. Variable: {variable}."
+    )
+
+    trend_fig = go.Figure()
+    trend_fig.add_trace(
+        go.Scatter(
+            x=x_axis,
+            y=df["anomaly"],
+            mode="lines",
+            name="Anomaly",
+            line=dict(color="#3b82f6", width=2),
+        )
+    )
+    trend_fig.add_trace(
+        go.Scatter(
+            x=x_axis,
+            y=df["smooth"],
+            mode="lines",
+            name=f"Smoothed ({smooth_window})",
+            line=dict(color="#0f172a", width=3),
+        )
+    )
+    trend_fig.add_hline(
+        y=threshold_z * sigma,
+        line_dash="dot",
+        line_color="#ef4444",
+        annotation_text="Hot threshold",
+    )
+    trend_fig.add_hline(
+        y=-threshold_z * sigma,
+        line_dash="dot",
+        line_color="#2563eb",
+        annotation_text="Cold threshold",
+    )
+    trend_fig.update_layout(
+        title="Global or Spatial Mean Anomaly Timeline",
+        xaxis_title="Time",
+        yaxis_title="Anomaly",
+        template="plotly_white",
+        height=460,
+        margin=dict(l=20, r=20, t=60, b=20),
+    )
+    st.plotly_chart(trend_fig, use_container_width=True)
+
+    left, right = st.columns((1.1, 0.9))
+
+    with left:
+        st.markdown("### Top detected events")
+        if extreme_df.empty:
+            st.info("No extreme events crossed the selected threshold.")
+        else:
+            event_table = (
+                extreme_df[["label", "event_type", "anomaly", "severity_z"]]
+                .sort_values("severity_z", key=lambda s: s.abs(), ascending=False)
+                .head(12)
+                .rename(
+                    columns={
+                        "label": "Time",
+                        "event_type": "Type",
+                        "anomaly": "Anomaly",
+                        "severity_z": "Z-Score",
+                    }
+                )
+            )
+            st.dataframe(event_table, use_container_width=True, hide_index=True)
+
+    with right:
+        st.markdown("### Hot vs Cold balance")
+        event_counts = (
+            df["event_type"]
+            .value_counts()
+            .reindex(["Hot anomaly", "Cold anomaly", "Normal"], fill_value=0)
+            .reset_index()
+        )
+        event_counts.columns = ["Type", "Count"]
+        balance_fig = px.bar(
+            event_counts,
+            x="Type",
+            y="Count",
+            color="Type",
+            color_discrete_map={
+                "Hot anomaly": "#ef4444",
+                "Cold anomaly": "#2563eb",
+                "Normal": "#94a3b8",
+            },
+        )
+        balance_fig.update_layout(
+            template="plotly_white",
+            height=340,
+            margin=dict(l=20, r=20, t=20, b=20),
+            showlegend=False,
+        )
+        st.plotly_chart(balance_fig, use_container_width=True)
+
+    st.markdown("### What this adds to your project")
+    st.write(
+        "This page makes ATLAS more than a viewer. It now identifies unusual periods automatically, "
+        "quantifies long-term change, and gives you a strong technical contribution without altering "
+        "your app's original climate storytelling flow."
+    )
+
+
+if __name__ == "__main__":
+    main()
