@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import streamlit as st
+import os
 
 from utils.data_loader import get_active_dataset
 from utils.style import apply_atlas_theme, render_feature_card, render_info_banner
@@ -14,10 +15,18 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+def get_api_config() -> dict[str, str]:
+    return {
+        "EARTHDATA_TOKEN": st.secrets.get("EARTHDATA_TOKEN", os.getenv("EARTHDATA_TOKEN", "")),
+        "API_KEY_1": st.secrets.get("API_KEY_1", os.getenv("API_KEY_1", "")),
+        "API_KEY_2": st.secrets.get("API_KEY_2", os.getenv("API_KEY_2", "")),
+        "API_KEY_3": st.secrets.get("API_KEY_3", os.getenv("API_KEY_3", "")),
+    }
 
 
 def main() -> None:
     apply_atlas_theme()
+    api_config = get_api_config()
     dataset, source_label = get_active_dataset()
     logo_path = Path(__file__).resolve().parent / "assets" / "atlas_logo.svg"
 
