@@ -21,6 +21,23 @@ ATLAS_CSS = """
             radial-gradient(circle at top left, rgba(212, 101, 74, 0.15), transparent 30%),
             linear-gradient(180deg, rgba(245, 240, 232, 1) 0%, rgba(250, 247, 242, 1) 100%);
     }
+        .stApp,
+    .stApp p,
+    .stApp h1,
+    .stApp h2,
+    .stApp h3,
+    .stApp h4,
+    .stApp h5,
+    .stApp h6,
+    .stMarkdown,
+    .stText,
+    .stCaption,
+    label,
+    span,
+    div {
+        color: var(--atlas-text);
+    }
+
 
     .atlas-hero,
     .atlas-panel,
